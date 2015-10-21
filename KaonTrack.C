@@ -57,8 +57,11 @@ public:
      // n pt range
      nran=20;
      cout<<nran<<endl;
-     for (int i=0;i<nran+1;i++){
+     for (int i=0;i<13;i++){
        pnode.push_back(0+i*0.1);
+     }
+     for (int i=13;i<nran+1;i++){
+       pnode.push_back(1.2+(i-12)*0.2);
      }
 
      hMmiss34  = new TH1D("hMmiss34" ,"M(K)",100,0.2,0.8);
@@ -105,13 +108,14 @@ public:
      for (int i=0; i<nran; i++)
      //int i=1;
      {
+       double pave = (pnode[i+1]+pnode[i])/2;
        cout<<"\n\n\n\n#################\n"<< i << endl;
-       cout<<"size of 4 trk is "<< data4trk.at(i)->GetEntries()<<endl;
+       cout<<"size of 4 trk is "<< data4trk.at(i)->GetBranch("mass")->GetEntries()<<endl;
        cout<<"size of 3/4 trk is "<< dataTtrk.at(i)->GetEntries()<<endl;
-       sprintf(suffix,"Trk4_%.1f", (pnode[i+1]+pnode[i])/2);
-       nsig = FitSpectrum(data4trk.at(i), i, suffix, &n4trk, &e4trk);
-       sprintf(suffix,"All_%.1f", (pnode[i+1]+pnode[i])/2);
-       nsig = FitSpectrum(dataTtrk.at(i), i, suffix, &nTtrk, &eTtrk);
+       sprintf(suffix,"Trk4_%.1f", pave);
+       nsig = FitSpectrum(data4trk.at(i), pave, suffix, &n4trk, &e4trk);
+       sprintf(suffix,"All_%.1f", pave);
+       nsig = FitSpectrum(dataTtrk.at(i), pave, suffix, &nTtrk, &eTtrk);
        double TrkEff = n4trk/nTtrk;
        // uncertainty, considering correlation, 原文龙
        double num = n4trk;
@@ -130,6 +134,46 @@ public:
      }
      return true;
    }
+   bool FitDataSet(int i)
+   {
+     cout<<"fitting data set"<<endl;
+     if (nran<1) return false;
+     if (nran<i) return false;
+     double nsig;
+     char suffix[1000];
+     double n4trk;
+     double e4trk;
+     double nTtrk;
+     double eTtrk;
+     //int i=1;
+     {
+       double pave = (pnode[i+1]+pnode[i])/2;
+       cout<<"\n\n\n\n#################\n"<< i << "\t average p "<< pave << endl;
+       cout<<"size of 4 trk is "<< data4trk.at(i)->GetBranch("mass")->GetEntries()<<endl;
+       cout<<"size of 3/4 trk is "<< dataTtrk.at(i)->GetEntries()<<endl;
+       sprintf(suffix,"Trk4_%.2f", pave);
+       nsig = FitSpectrum(data4trk.at(i), pave, suffix, &n4trk, &e4trk);
+       sprintf(suffix,"All_%.2f", pave);
+       nsig = FitSpectrum(dataTtrk.at(i), pave, suffix, &nTtrk, &eTtrk);
+       double TrkEff = n4trk/nTtrk;
+       // uncertainty, considering correlation, 原文龙
+       double num = n4trk;
+       double Num = nTtrk;
+     //double covnn = pow(e4trk,2);
+     //double covnN = pow(e4trk,2);
+     //double covNn = pow(e4trk,2);
+     //double covNN = pow(eTtrk,2);
+       double EffErr = 1./Num*sqrt((1-2*TrkEff)*pow(e4trk,2)+pow(TrkEff,2)*pow(eTtrk,2));
+       //double EffErr = TrkEff*sqrt(pow(e4trk/n4trk,2)+pow(eTtrk/nTtrk,2));
+ 
+       npran.push_back( (pnode[i+1]+pnode[i])/2);
+       epran.push_back( (pnode[i+1]-pnode[i])/2);
+       neff.push_back( TrkEff);
+       eeff.push_back( EffErr);
+     }
+     return true;
+   }
+
 
    void ShowInHist()
    {
@@ -167,6 +211,7 @@ public:
 
 double GetEnergy(int run)
 {
+  run = abs(run);
   if (run>=39335 && run<=39618) return 3.08;
   if (run>=39711 && run<=39738) return 3.02;
   if (run>=39680 && run<=39710) return 3.00;
@@ -232,6 +277,7 @@ void KaonTrack::Loop(TrackingAlg* trkalg)
    fChain->GetEntry(0);
    double Ecm = GetEnergy(run);
    //TLorentzVector EPcms(Ecm*sin(0.011),0,0,Ecm);
+   cout<<"Beam energy is "<< Ecm << endl;
 
    TLorentzVector trk[4];
    double mpi = 0.13957;
@@ -297,8 +343,12 @@ void KaonTrack::Loop(TrackingAlg* trkalg)
       // transverse momentum
       double ptkm = trk[3].Pt();
       double Coskm = trk[3].CosTheta();
-      int idx = (int)(ptkm/0.1);
+      int idx = -1;
+      for (int i=0;i<nran;i++){
+        if (ptkm>prange[i] && ptkm<prange[i+1]){idx=i; break;}
+      }
       if (idx>=nran) continue;
+      if (idx<0) continue;
       if (fabs(Coskm)>0.93) continue;
       mass = trktot.M();
 
@@ -372,21 +422,33 @@ int main(int argc, char** argv)
   TrackingAlg trking;
   cout<<"KaonTrack"<<endl;
   KaonTrack* t;
-  if (argc==1) t = new KaonTrack();
+  vector<char*> files;
+  int partid=-1;
+  //if (argc==1) t = new KaonTrack();
+  if (argc==1) return -1;
   else {
-    for (int i=1;i<argc;i++){
-      cout<<"user input file "<< argv[i]<<endl;
-      TFile *f = new TFile(argv[i]);
-      TTree* tree = (TTree*)f->Get("KaonTrack");
-      t = new KaonTrack(tree);
-      cout<<"Loop?"<<endl;
-      ofile->cd();
-      t->Loop(&trking);
-      delete t;
+    for (int i=1;i<argc;i++)
+    {
+      if (argv[i][0]=='-') partid=atoi(&argv[i][1]);
+      else files.push_back(argv[i]);
     }
   }
-  trking.ShowInHist();
-  trking.FitDataSet();
+  
+  for (int i=0;i<files.size();i++)
+  {
+    cout<<"user input file "<< files.at(i)<<endl;
+    TFile *f = new TFile(files.at(i));
+    TTree* tree = (TTree*)f->Get("KaonTrack");
+    t = new KaonTrack(tree);
+    cout<<"Loop?"<<endl;
+    ofile->cd();
+    t->Loop(&trking);
+    delete t;
+  }
+
+  //trking.ShowInHist();
+  if (partid!=-1) trking.FitDataSet(partid);
+  else trking.FitDataSet();
   trking.CreateEffVsPt();
   return 0;
 }
@@ -703,7 +765,7 @@ double FitSpectrum(TTree *dataraw, double beame, const char* namesfx, double *ns
    // try to use roofit
    RooRealVar x("mass","momentum",peakvalue,beamlow,beamup,"GeV");
    RooRealVar mean("mean","mean of gaussian",peakvalue-0.001,peakvalue-0.01,peakvalue+0.01);
-   RooRealVar sigma("sigma","width of gaussian",0.0135+0.01/10*beame,0.013,0.03);
+   RooRealVar sigma("sigma","width of gaussian",0.011+0.01*beame,0.010,0.03);
  //RooGaussian gaus("gaus","gauss(x,m,s)",x,mean,sigma);
    
    RooRealVar co1("co1","coefficient #1",   0 ,-100.,100.);
@@ -717,7 +779,7 @@ double FitSpectrum(TTree *dataraw, double beame, const char* namesfx, double *ns
    RooRealVar background("background"," ",600,0,100000000);
      
    //RooRealVar sigma2("sigma2","width of gaussian",0.01,0.008,0.02);
-   RooRealVar alpha1("alpha1","#alpha",-1.2,-5.0,5.0);
+   RooRealVar alpha1("alpha1","#alpha",-1.5,-5.0,5.0);
    RooRealVar nnn1("n1","n",100,1,200);
    RooCBShape cbshape("cbshape1","crystal ball",x,mean,sigma,alpha1,nnn1);
 
@@ -754,7 +816,7 @@ double FitSpectrum(TTree *dataraw, double beame, const char* namesfx, double *ns
    sum->plotOn(xframe  );
    //sum->plotOn(xframe);
    xframe->Draw();
-   TPaveText *pt = new TPaveText(0.15,0.65,0.45,0.90,"BRNDC");
+   TPaveText *pt = new TPaveText(0.65,0.65,0.85,0.90,"BRNDC");
    pt->SetBorderSize(0);
    pt->SetFillStyle(4000);
    pt->SetTextAlign(12);
@@ -780,7 +842,7 @@ double FitSpectrum(TTree *dataraw, double beame, const char* namesfx, double *ns
    //fitpar<<"\t bkg mean = " << meanb.getVal() << "\t bkg sigma = " << sigmab.getVal();
    fitpar<<"\t sigNo = " << signal.getVal() << "\t sigNoE = " << signal.getError();
    fitpar<<"\t bckNo = " << background.getVal() << "\t bckNoE = " << background.getError();
-   fitpar<< std::endl;;
+   fitpar<<"\t chi: "<<xframe->chiSquare(Npar) <<  std::endl;;
    //fitpar<<"\t e mean = " << meane.getVal() << "\t e sigma = " << sigmae.getVal()<<std::endl;
    
    //c1->Print("fit6pi.eps");
