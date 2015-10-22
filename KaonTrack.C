@@ -11,6 +11,7 @@
 using namespace std;
 
 double FitSpectrum(TTree *dataraw, double beame, const char* namesfx=0, double *nsig=0, double *esig=0);
+double FitSpectrum2(TTree *dataraw, double beame, const char* namesfx=0, double *nsig=0, double *esig=0);
 
 class TrackingAlg
 {
@@ -55,13 +56,13 @@ public:
    {
      cout<<"Construct tracking alg"<<endl;
      // n pt range
-     nran=20;
+     nran=30;
      cout<<nran<<endl;
-     for (int i=0;i<13;i++){
-       pnode.push_back(0+i*0.1);
+     for (int i=0;i<25;i++){
+       pnode.push_back(0+i*0.05);
      }
-     for (int i=13;i<nran+1;i++){
-       pnode.push_back(1.2+(i-12)*0.2);
+     for (int i=25;i<nran+1;i++){
+       pnode.push_back(1.2+(i-24)*0.1);
      }
 
      hMmiss34  = new TH1D("hMmiss34" ,"M(K)",100,0.2,0.8);
@@ -112,10 +113,10 @@ public:
        cout<<"\n\n\n\n#################\n"<< i << endl;
        cout<<"size of 4 trk is "<< data4trk.at(i)->GetBranch("mass")->GetEntries()<<endl;
        cout<<"size of 3/4 trk is "<< dataTtrk.at(i)->GetEntries()<<endl;
-       sprintf(suffix,"Trk4_%.1f", pave);
-       nsig = FitSpectrum(data4trk.at(i), pave, suffix, &n4trk, &e4trk);
-       sprintf(suffix,"All_%.1f", pave);
-       nsig = FitSpectrum(dataTtrk.at(i), pave, suffix, &nTtrk, &eTtrk);
+       sprintf(suffix,"Trk4_%.3f", pave);
+       nsig = FitSpectrum2(data4trk.at(i), pave, suffix, &n4trk, &e4trk);
+       sprintf(suffix,"All_%.3f", pave);
+       nsig = FitSpectrum2(dataTtrk.at(i), pave, suffix, &nTtrk, &eTtrk);
        double TrkEff = n4trk/nTtrk;
        // uncertainty, considering correlation, 原文龙
        double num = n4trk;
@@ -151,10 +152,10 @@ public:
        cout<<"\n\n\n\n#################\n"<< i << "\t average p "<< pave << endl;
        cout<<"size of 4 trk is "<< data4trk.at(i)->GetBranch("mass")->GetEntries()<<endl;
        cout<<"size of 3/4 trk is "<< dataTtrk.at(i)->GetEntries()<<endl;
-       sprintf(suffix,"Trk4_%.2f", pave);
-       nsig = FitSpectrum(data4trk.at(i), pave, suffix, &n4trk, &e4trk);
-       sprintf(suffix,"All_%.2f", pave);
-       nsig = FitSpectrum(dataTtrk.at(i), pave, suffix, &nTtrk, &eTtrk);
+       sprintf(suffix,"Trk4_%.3f", pave);
+       nsig = FitSpectrum2(data4trk.at(i), pave, suffix, &n4trk, &e4trk);
+       sprintf(suffix,"All_%.3f", pave);
+       nsig = FitSpectrum2(dataTtrk.at(i), pave, suffix, &nTtrk, &eTtrk);
        double TrkEff = n4trk/nTtrk;
        // uncertainty, considering correlation, 原文龙
        double num = n4trk;
@@ -764,13 +765,13 @@ double FitSpectrum(TTree *dataraw, double beame, const char* namesfx, double *ns
    double beamup=0.8;
    // try to use roofit
    RooRealVar x("mass","momentum",peakvalue,beamlow,beamup,"GeV");
-   RooRealVar mean("mean","mean of gaussian",peakvalue-0.001,peakvalue-0.01,peakvalue+0.01);
-   RooRealVar sigma("sigma","width of gaussian",0.011+0.01*beame,0.010,0.03);
+   RooRealVar mean("mean","mean of gaussian",peakvalue,peakvalue-0.01,peakvalue+0.01);
+   RooRealVar sigma("sigma","width of gaussian",0.015+0.01*beame,0.010,0.03);
  //RooGaussian gaus("gaus","gauss(x,m,s)",x,mean,sigma);
    
    RooRealVar co1("co1","coefficient #1",   0 ,-100.,100.);
    RooRealVar co2("co2","coefficient #2",   0 ,-100.,100.);
-   RooRealVar co3("co3","coefficient #2",   0.1 ,-100.,100.);
+   RooRealVar co3("co3","coefficient #2",   0 ,-100.,100.);
    RooRealVar co4("co4","coefficient #2",   0 ,-100.,100.);
    //RooChebychev ground("ground","background",x,RooArgList(co1,co2,co3));
    RooPolynomial ground("ground","background",x,RooArgList(co1,co2,co3,co4));
@@ -779,7 +780,7 @@ double FitSpectrum(TTree *dataraw, double beame, const char* namesfx, double *ns
    RooRealVar background("background"," ",600,0,100000000);
      
    //RooRealVar sigma2("sigma2","width of gaussian",0.01,0.008,0.02);
-   RooRealVar alpha1("alpha1","#alpha",-1.5,-5.0,5.0);
+   RooRealVar alpha1("alpha1","#alpha",1.0,-5.0,5.0);
    RooRealVar nnn1("n1","n",100,1,200);
    RooCBShape cbshape("cbshape1","crystal ball",x,mean,sigma,alpha1,nnn1);
 
@@ -855,6 +856,113 @@ double FitSpectrum(TTree *dataraw, double beame, const char* namesfx, double *ns
    if (esig!=0) *esig = signal.getError();
    return signal.getVal();
 }
+
+double FitSpectrum2(TTree *dataraw, double beame, const char* namesfx, double *nsig, double *esig)
+{
+   int nBins=100;
+   int Npar;
+   double mka = 0.493677;
+   double peakvalue = mka;
+   double beamlow=0.3;
+   double beamup=0.8;
+   // try to use roofit
+   RooRealVar x("mass","momentum",peakvalue,beamlow,beamup,"GeV");
+   RooRealVar mean("mean","mean of gaussian",peakvalue,peakvalue-0.01,peakvalue+0.01);
+   RooRealVar sigma("sigma","width of gaussian",0.011+0.01*beame,0.008,0.25);
+   RooGaussian gaus("gaus","gauss(x,m,s)",x,mean,sigma);
+   
+   RooRealVar sigma2("sigma2","width of gaussian",0.03,0.025,0.04);
+   RooGaussian gaus2("gaus2","gauss(x,m,s)",x,mean,sigma2);
+
+   RooRealVar co1("co1","coefficient #1",   0 ,-100.,100.);
+   RooRealVar co2("co2","coefficient #2",   0 ,-100.,100.);
+   RooRealVar co3("co3","coefficient #2",   0 ,-100.,100.);
+   //RooChebychev ground("ground","background",x,RooArgList(co1,co2,co3));
+   RooPolynomial ground("ground","background",x,RooArgList(co1,co2,co3));
+
+   RooRealVar signal("signal"," ",2000,0,10000000);//event number
+   RooRealVar signal1("signal1"," ",1000,0,10000000);//event number
+   RooRealVar signal2("signal2"," ",1000,0,10000000);//event number
+   RooRealVar background("background"," ",600,0,100000000);
+     
+   RooRealVar alpha1("alpha1","#alpha",1.0,-5.0,5.0);
+   RooRealVar nnn1("n1","n",100,1,200);
+   RooCBShape cbshape("cbshape1","crystal ball",x,mean,sigma,alpha1,nnn1);
+
+   RooAddPdf *sum;
+   RooDataSet *dataset;
+   RooPlot *xframe;
+   RooAddPdf sig("sig","signal",RooArgList(gaus,gaus2),RooArgList(signal1,signal2));
+   //RooDataHist *data_6pi;
+   
+   RooMsgService::instance().setGlobalKillBelow(RooFit::ERROR); // set out put message level of roofit
+   TCanvas *c1 = new TCanvas("","",800,600);
+
+   char tmpchr[100];
+   sprintf(tmpchr,"data_Mmiss_%s",namesfx);
+   xframe = x.frame(Title("fit p"));
+  // dataset = new RooDataSet(tmpchr,"data",RooArgSet(x),Import(*dataraw));
+   
+   char name[100];
+   char drawopt[100];
+   TH1D *hmKm;
+   sprintf(name,"mass_%f",beame);
+   hmKm = new TH1D(name,name,100,0.1,0.9);
+   sprintf(drawopt,"mass>>%s",name);
+   dataraw->Draw(drawopt);
+   RooDataHist *datahist = new RooDataHist(tmpchr,"data",x,hmKm);
+ 
+   
+   sum = new RooAddPdf("sum","sum",RooArgList(sig,ground),RooArgList(signal,background));
+   Npar = 10;
+   sum->fitTo(*datahist);
+   //dataset->plotOn(xframe);
+   datahist->plotOn(xframe);
+   sum->plotOn(xframe,Components(cbshape),LineStyle(2),LineColor(2) );
+   sum->plotOn(xframe,Components(ground),LineStyle(2),LineColor(3)  );
+   sum->plotOn(xframe  );
+   //sum->plotOn(xframe);
+   xframe->Draw();
+   TPaveText *pt = new TPaveText(0.65,0.65,0.85,0.90,"BRNDC");
+   pt->SetBorderSize(0);
+   pt->SetFillStyle(4000);
+   pt->SetTextAlign(12);
+   pt->SetTextFont(42);
+   pt->SetTextSize(0.035);
+   sprintf(tmpchr,"#mu_{1} = %1.6f #pm %1.6f",mean.getVal(),mean.getError());
+   pt->AddText(tmpchr);
+   sprintf(tmpchr,"#sigma_{1} = %1.6f #pm %1.6f",sigma.getVal(),sigma.getError());
+   pt->AddText(tmpchr);
+   sprintf(tmpchr,"signal1 = %.2f #pm %.2f",signal.getVal(),signal.getError());
+   pt->AddText(tmpchr);
+   sprintf(tmpchr,"#chi^{2}/(%d-%d) = %5.6f",nBins,Npar,xframe->chiSquare(Npar));
+   pt->AddText(tmpchr);
+   pt->Draw();
+   sprintf(tmpchr,"p_spectrum_%s",namesfx);
+   c1->SetName(tmpchr);
+   c1->Write();
+   sprintf(tmpchr,"p_spectrum_%s.png",namesfx);
+   c1->Print(tmpchr);
+
+   ofstream fitpar("fitpar",std::ios::app);
+   fitpar<<" ene = "<< beame <<"\t sig mean = "<< mean.getVal() << "\t sig sigma = "<< sigma.getVal();
+   //fitpar<<"\t bkg mean = " << meanb.getVal() << "\t bkg sigma = " << sigmab.getVal();
+   fitpar<<"\t sigNo = " << signal.getVal() << "\t sigNoE = " << signal.getError();
+   fitpar<<"\t bckNo = " << background.getVal() << "\t bckNoE = " << background.getError();
+   fitpar<<"\t chi: "<<xframe->chiSquare(Npar) <<  std::endl;;
+   //fitpar<<"\t e mean = " << meane.getVal() << "\t e sigma = " << sigmae.getVal()<<std::endl;
+   
+   //c1->Print("fit6pi.eps");
+   //delete data_6pi;
+   delete xframe;
+   //delete dataset;
+   delete datahist;
+   delete sum;
+   if (nsig!=0) *nsig = signal.getVal();
+   if (esig!=0) *esig = signal.getError();
+   return signal.getVal();
+}
+
 
 
 
