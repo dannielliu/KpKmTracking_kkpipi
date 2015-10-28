@@ -12,6 +12,7 @@ using namespace std;
 
 double FitSpectrum(TTree *dataraw, double beame, const char* namesfx=0, double *nsig=0, double *esig=0);
 double FitSpectrum2(TTree *dataraw, double beame, const char* namesfx=0, double *nsig=0, double *esig=0);
+double SimFit(TTree *dataraw1, TTree *dataraw2, double beame, const char* namesfx=0, double *nsig=0, double *esig=0);
 
 class TrackingAlg
 {
@@ -153,9 +154,9 @@ public:
        cout<<"size of 4 trk is "<< data4trk.at(i)->GetBranch("mass")->GetEntries()<<endl;
        cout<<"size of 3/4 trk is "<< dataTtrk.at(i)->GetEntries()<<endl;
        sprintf(suffix,"Trk4_%.3f", pave);
-       nsig = FitSpectrum2(data4trk.at(i), pave, suffix, &n4trk, &e4trk);
+       nsig = FitSpectrum(data4trk.at(i), pave, suffix, &n4trk, &e4trk);
        sprintf(suffix,"All_%.3f", pave);
-       nsig = FitSpectrum2(dataTtrk.at(i), pave, suffix, &nTtrk, &eTtrk);
+       nsig = FitSpectrum(dataTtrk.at(i), pave, suffix, &nTtrk, &eTtrk);
        double TrkEff = n4trk/nTtrk;
        // uncertainty, considering correlation, 原文龙
        double num = n4trk;
@@ -174,6 +175,67 @@ public:
      }
      return true;
    }
+   bool SimFitDataSet()
+   {
+     cout<<"fitting data set"<<endl;
+     if (nran<1) return false;
+     double nsig;
+     char suffix[1000];
+     double n2[2], nerr2[2];
+     double &n4trk=n2[0];
+     double &e4trk=nerr2[0];
+     double &nTtrk=n2[1];
+     double &eTtrk=nerr2[1];
+     for (int i=0; i<nran; i++)
+     {
+       double pave = (pnode[i+1]+pnode[i])/2;
+       cout<<"\n\n\n\n#################\n"<< i << endl;
+       cout<<"size of 4 trk is "<< data4trk.at(i)->GetBranch("mass")->GetEntries()<<endl;
+       cout<<"size of 3/4 trk is "<< dataTtrk.at(i)->GetEntries()<<endl;
+       sprintf(suffix,"Trk_%.3f", pave);
+       nsig = SimFit(data4trk.at(i),dataTtrk.at(i), pave, suffix, n2, nerr2);
+       double TrkEff = n4trk/nTtrk;
+       // uncertainty, considering correlation, 原文龙
+       double num = n4trk;
+       double Num = nTtrk;
+     //double covnn = pow(e4trk,2);
+     //double covnN = pow(e4trk,2);
+     //double covNn = pow(e4trk,2);
+     //double covNN = pow(eTtrk,2);
+       double EffErr = 1./Num*sqrt((1-2*TrkEff)*pow(e4trk,2)+pow(TrkEff,2)*pow(eTtrk,2));
+       //double EffErr = TrkEff*sqrt(pow(e4trk/n4trk,2)+pow(eTtrk/nTtrk,2));
+ 
+       npran.push_back( (pnode[i+1]+pnode[i])/2);
+       epran.push_back( (pnode[i+1]-pnode[i])/2);
+       neff.push_back( TrkEff);
+       eeff.push_back( EffErr);
+     }
+     return true;
+   }
+   bool SimFitDataSet(int i)
+   {
+     cout<<"fitting data set"<<endl;
+     if (nran<1) return false;
+     if (nran<i) return false;
+     double nsig;
+     char suffix[1000];
+     double n2[2], nerr2[2];
+     double &n4trk=n2[0];
+     double &e4trk=nerr2[0];
+     double &nTtrk=n2[1];
+     double &eTtrk=nerr2[1];
+     //int i=1;
+     {
+       double pave = (pnode[i+1]+pnode[i])/2;
+       cout<<"\n\n\n\n#################\n"<< i << "\t average p "<< pave << endl;
+       cout<<"size of 4 trk is "<< data4trk.at(i)->GetBranch("mass")->GetEntries()<<endl;
+       cout<<"size of 3/4 trk is "<< dataTtrk.at(i)->GetEntries()<<endl;
+       sprintf(suffix,"Trk_%.3f", pave);
+       nsig = SimFit(data4trk.at(i),dataTtrk.at(i), pave,suffix,n2,nerr2);
+     }
+     return true;
+   }
+
 
 
    void ShowInHist()
@@ -448,9 +510,9 @@ int main(int argc, char** argv)
   }
 
   //trking.ShowInHist();
-  if (partid!=-1) trking.FitDataSet(partid);
-  else trking.FitDataSet();
-  trking.CreateEffVsPt();
+  if (partid!=-1) trking.SimFitDataSet(partid);
+  else trking.SimFitDataSet();
+  //trking.CreateEffVsPt();
   return 0;
 }
 
@@ -470,6 +532,8 @@ int main(int argc, char** argv)
 #include "RooDataHist.h"
 #include "RooDataSet.h"
 #include "RooAddPdf.h"
+#include "RooSimultaneous.h"
+#include "RooCategory.h"
 #include "RooArgList.h"
 #include "RooPlot.h"
 #include "RooMsgService.h"
@@ -762,11 +826,11 @@ double FitSpectrum(TTree *dataraw, double beame, const char* namesfx, double *ns
    double mka = 0.493677;
    double peakvalue = mka;
    double beamlow=0.3;
-   double beamup=0.8;
+   double beamup=0.9;
    // try to use roofit
    RooRealVar x("mass","momentum",peakvalue,beamlow,beamup,"GeV");
    RooRealVar mean("mean","mean of gaussian",peakvalue,peakvalue-0.01,peakvalue+0.01);
-   RooRealVar sigma("sigma","width of gaussian",0.015+0.01*beame,0.010,0.03);
+   RooRealVar sigma("sigma","width of gaussian",0.013+0.01*beame,0.010,0.03);
  //RooGaussian gaus("gaus","gauss(x,m,s)",x,mean,sigma);
    
    RooRealVar co1("co1","coefficient #1",   0 ,-100.,100.);
@@ -780,7 +844,7 @@ double FitSpectrum(TTree *dataraw, double beame, const char* namesfx, double *ns
    RooRealVar background("background"," ",600,0,100000000);
      
    //RooRealVar sigma2("sigma2","width of gaussian",0.01,0.008,0.02);
-   RooRealVar alpha1("alpha1","#alpha",1.0,-5.0,5.0);
+   RooRealVar alpha1("alpha1","#alpha",-1.0,-5.0,5.0);
    RooRealVar nnn1("n1","n",100,1,200);
    RooCBShape cbshape("cbshape1","crystal ball",x,mean,sigma,alpha1,nnn1);
 
@@ -795,23 +859,23 @@ double FitSpectrum(TTree *dataraw, double beame, const char* namesfx, double *ns
    char tmpchr[100];
    sprintf(tmpchr,"data_Mmiss_%s",namesfx);
    xframe = x.frame(Title("fit p"));
-  // dataset = new RooDataSet(tmpchr,"data",RooArgSet(x),Import(*dataraw));
+   dataset = new RooDataSet(tmpchr,"data",RooArgSet(x),Import(*dataraw));
    
    char name[100];
-   char drawopt[100];
-   TH1D *hmKm;
-   sprintf(name,"mass_%f",beame);
-   hmKm = new TH1D(name,name,100,0.1,0.9);
-   sprintf(drawopt,"mass>>%s",name);
-   dataraw->Draw(drawopt);
-   RooDataHist *datahist = new RooDataHist(tmpchr,"data",x,hmKm);
+ //char drawopt[100];
+ //TH1D *hmKm;
+ //sprintf(name,"mass_%f",beame);
+ //hmKm = new TH1D(name,name,100,0.1,0.9);
+ //sprintf(drawopt,"mass>>%s",name);
+ //dataraw->Draw(drawopt);
+ //RooDataHist *datahist = new RooDataHist(tmpchr,"data",x,hmKm);
  
-   
    sum = new RooAddPdf("sum","sum",RooArgList(cbshape,ground),RooArgList(signal,background));
    Npar = 9;
-   sum->fitTo(*datahist);
-   //dataset->plotOn(xframe);
-   datahist->plotOn(xframe);
+   sum->fitTo(*dataset);
+   dataset->plotOn(xframe);
+   //sum->fitTo(*datahist);
+   //datahist->plotOn(xframe);
    sum->plotOn(xframe,Components(cbshape),LineStyle(2),LineColor(2) );
    sum->plotOn(xframe,Components(ground),LineStyle(2),LineColor(3)  );
    sum->plotOn(xframe  );
@@ -849,8 +913,8 @@ double FitSpectrum(TTree *dataraw, double beame, const char* namesfx, double *ns
    //c1->Print("fit6pi.eps");
    //delete data_6pi;
    delete xframe;
-   //delete dataset;
-   delete datahist;
+   delete dataset;
+   //delete datahist;
    delete sum;
    if (nsig!=0) *nsig = signal.getVal();
    if (esig!=0) *esig = signal.getError();
@@ -868,7 +932,7 @@ double FitSpectrum2(TTree *dataraw, double beame, const char* namesfx, double *n
    // try to use roofit
    RooRealVar x("mass","momentum",peakvalue,beamlow,beamup,"GeV");
    RooRealVar mean("mean","mean of gaussian",peakvalue,peakvalue-0.01,peakvalue+0.01);
-   RooRealVar sigma("sigma","width of gaussian",0.011+0.01*beame,0.008,0.25);
+   RooRealVar sigma("sigma","width of gaussian",0.013+0.01*beame,0.008,0.25);
    RooGaussian gaus("gaus","gauss(x,m,s)",x,mean,sigma);
    
    RooRealVar sigma2("sigma2","width of gaussian",0.03,0.025,0.04);
@@ -964,5 +1028,129 @@ double FitSpectrum2(TTree *dataraw, double beame, const char* namesfx, double *n
 }
 
 
+double SimFit(TTree *dataraw1, TTree *dataraw2, double beame, const char* namesfx, double *nsig, double *esig)
+{
+   int nBins=100;
+   int Npar;
+   double mka = 0.493677;
+   double peakvalue = mka;
+   double beamlow=0.3;
+   double beamup=0.9;
+   
+   // try to use roofit
+   RooRealVar x("mass","momentum",peakvalue,beamlow,beamup,"GeV");
+   RooRealVar mean("mean","mean of gaussian",peakvalue,peakvalue-0.01,peakvalue+0.01);
+   RooRealVar sigma("sigma","width of gaussian",0.014+0.01*beame,0.010,0.03);
+ //RooGaussian gaus("gaus","gauss(x,m,s)",x,mean,sigma);
+   RooRealVar alpha("alpha","#alpha",-1.0,-5.0,5.0);
+   RooRealVar nnn("n1","n",100,1,200);
+   RooCBShape cbshape("cbshape","crystal ball",x,mean,sigma,alpha,nnn);
+   
+   RooRealVar co1o1("co1o1","coefficient #1",   0 ,-100.,100.);
+   RooRealVar co1o2("co1o2","coefficient #2",   0 ,-100.,100.);
+   RooRealVar co1o3("co1o3","coefficient #2",   0 ,-100.,100.);
+   RooRealVar co1o4("co1o4","coefficient #2",   0 ,-100.,100.);
+   RooPolynomial ground1("ground1","background",x,RooArgList(co1o1,co1o2,co1o3,co1o4));
+   
+   RooRealVar co2o1("co2o1","coefficient #1",   0 ,-100.,100.);
+   RooRealVar co2o2("co2o2","coefficient #2",   0 ,-100.,100.);
+   RooRealVar co2o3("co2o3","coefficient #2",   0 ,-100.,100.);
+   RooRealVar co2o4("co2o4","coefficient #2",   0 ,-100.,100.);
+   RooPolynomial ground2("ground2","background",x,RooArgList(co2o1,co2o2,co2o3,co2o4));
+   
+   RooRealVar signal1("signal1"," ",1000,0,10000000);//event number
+   RooRealVar background1("background1"," ",600,0,100000000);
+     
+   RooRealVar signal2("signal2"," ",1000,0,10000000);//event number
+   RooRealVar background2("background2"," ",600,0,100000000);
 
+   RooAddPdf model1("model1","model1",RooArgList(cbshape,ground1),RooArgList(signal1,background1));
+   RooAddPdf model2("model2","model2",RooArgList(cbshape,ground2),RooArgList(signal2,background2));
+
+   //RooAddPdf *sum;
+   RooDataSet *dataset1 = new RooDataSet("data1","data1",RooArgSet(x),Import(*dataraw1));
+   RooDataSet *dataset2 = new RooDataSet("data2","data2",RooArgSet(x),Import(*dataraw2));
+   
+   RooCategory cate("cate","cate");
+   cate.defineType("ARec");
+   cate.defineType("AEvt");
+   
+   // combined data
+   RooDataSet combData("combData","combined data",x,Index(cate),Import("ARec",*dataset1),Import("AEvt",*dataset2));
+   
+   // construct a simultaneous pdf using category sample as index
+   RooSimultaneous simPdf("simPdf","simultaneous pdf",cate);
+   simPdf.addPdf(model1,"ARec");
+   simPdf.addPdf(model2,"AEvt");
+
+   RooMsgService::instance().setGlobalKillBelow(RooFit::ERROR); // set out put message level of roofit
+   
+   simPdf.fitTo(combData);
+   
+   RooPlot* frame1 = x.frame(Title("All reconstructed"));
+   RooPlot* frame2 = x.frame(Title("All events"));
+   combData.plotOn(frame1,Cut("cate==cate::ARec"));
+   combData.plotOn(frame2,Cut("cate==cate::AEvt"));
+   simPdf.plotOn(frame1,Slice(cate,"ARec"),Components("ground1"),ProjWData(cate,combData),LineStyle(kDashed),LineColor(kBlue));
+   simPdf.plotOn(frame1,Slice(cate,"ARec"),Components("cbshape"),ProjWData(cate,combData),LineStyle(kDashed),LineColor(kGreen));
+   simPdf.plotOn(frame1,Slice(cate,"ARec"),ProjWData(cate,combData));
+   simPdf.plotOn(frame2,Slice(cate,"AEvt"),Components("ground2"),ProjWData(cate,combData),LineStyle(kDashed),LineColor(kBlue));
+   simPdf.plotOn(frame2,Slice(cate,"AEvt"),Components("cbshape"),ProjWData(cate,combData),LineStyle(kDashed),LineColor(kGreen));
+   simPdf.plotOn(frame2,Slice(cate,"AEvt"),ProjWData(cate,combData));
+   
+   TCanvas *c1 = new TCanvas("c1","tracking efficiency",1000,400);
+   c1->Divide(2);
+   c1->cd(1);gPad->SetLeftMargin(0.15);frame1->GetYaxis()->SetTitleOffset(1.4);frame1->Draw();
+   c1->cd(2);gPad->SetLeftMargin(0.15);frame2->GetYaxis()->SetTitleOffset(1.4);frame2->Draw();
+   
+   char name[100];
+   Npar = 10;
+   TPaveText *pt1 = new TPaveText(0.6,0.68,0.88,0.88,"BRNDC");
+   pt1->SetBorderSize(0); pt1->SetFillStyle(4000);
+   pt1->SetTextAlign(12); pt1->SetTextFont(42); pt1->SetTextSize(0.035);
+   sprintf(name,"#mu = %1.5f #pm %1.5f",mean.getVal(),mean.getError()); pt1->AddText(name);
+   sprintf(name,"#sigma = %1.5f #pm %1.5f",sigma.getVal(),sigma.getError()); pt1->AddText(name);
+   sprintf(name,"signal1 = %.1f #pm %.1f",signal1.getVal(),signal1.getError()); pt1->AddText(name);
+   sprintf(name,"#chi^{2}/(%d-%d) = %5.3f",nBins,Npar,frame1->chiSquare(Npar)); pt1->AddText(name);
+   c1->cd(1); pt1->Draw();
+ 
+   TPaveText *pt2 = new TPaveText(0.6,0.68,0.88,0.88,"BRNDC");
+   pt2->SetBorderSize(0); pt2->SetFillStyle(4000);
+   pt2->SetTextAlign(12); pt2->SetTextFont(42); pt2->SetTextSize(0.035);
+   sprintf(name,"#mu = %1.5f #pm %1.5f",mean.getVal(),mean.getError()); pt2->AddText(name);
+   sprintf(name,"#sigma = %1.5f #pm %1.5f",sigma.getVal(),sigma.getError()); pt2->AddText(name);
+   sprintf(name,"signal2 = %.1f #pm %.1f",signal2.getVal(),signal2.getError()); pt2->AddText(name);
+   sprintf(name,"#chi^{2}/(%d-%d) = %5.3f",nBins,Npar,frame2->chiSquare(Npar)); pt2->AddText(name);
+   c1->cd(2); pt2->Draw();
+   sprintf(name,"p_spectrum_%s",namesfx);
+   c1->SetName(name);
+   c1->Write();
+   sprintf(name,"p_spectrum_%s.png",namesfx);
+   c1->Print(name);
+
+  // c1->Print("test.pdf");
+   delete pt1;
+   delete pt2;
+   delete c1;
+   
+   
+   ofstream fitpar("fitpar",std::ios::app);
+   fitpar<<" ene = "<< beame <<"\t sig mean = "<< mean.getVal() << "\t sig sigma = "<< sigma.getVal();
+   //fitpar<<"\t bkg mean = " << meanb.getVal() << "\t bkg sigma = " << sigmab.getVal();
+   fitpar<<"\t sigNo = " << signal1.getVal() << "\t sigNoE = " << signal1.getError();
+   fitpar<<"\t bckNo = " << background1.getVal() << "\t bckNoE = " << background1.getError();
+   fitpar<<"\t chi1: "<<frame1->chiSquare(Npar) <<  std::endl;;
+   //fitpar<<"\t bkg mean = " << meanb.getVal() << "\t bkg sigma = " << sigmab.getVal();
+   fitpar<<" ene = "<< beame <<"\t sig mean = "<< mean.getVal() << "\t sig sigma = "<< sigma.getVal();
+   fitpar<<"\t sigNo = " << signal2.getVal() << "\t sigNoE = " << signal2.getError();
+   fitpar<<"\t bckNo = " << background2.getVal() << "\t bckNoE = " << background2.getError();
+   fitpar<<"\t chi2: "<<frame2->chiSquare(Npar) <<  std::endl;;
+   //fitpar<<"\t e mean = " << meane.getVal() << "\t e sigma = " << sigmae.getVal()<<std::endl;
+   
+   if (nsig!=0) {nsig[0] = signal1.getVal(); nsig[1] = signal2.getVal(); }
+   if (esig!=0) {esig[0] = signal1.getError(); esig[1] = signal2.getError(); }
+   delete dataset1;
+   delete dataset2;
+   return signal1.getVal();
+}
 
