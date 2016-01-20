@@ -1,12 +1,14 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+using namespace std;
 #include "TGraphErrors.h"
 #include "TCanvas.h"
 #include "TAxis.h"
 #include "TLegend.h"
+#include "TF1.h"
+#include "TFile.h"
 #include "CommonFunc.h"
-using namespace std;
 
 int EffVsP(const char* filename, TGraphErrors *&graph_mckm)
 {
@@ -22,6 +24,8 @@ int EffVsP(const char* filename, TGraphErrors *&graph_mckm)
   double npe[100];
   double neff[100];
   double neffe[100];
+//double ndeff[100];
+//double ndeffe[100];
   istringstream iss;
   while (!txtfile.eof()){
     double pave, N4trk, N4err, pave2,NAtrk, NAerr;
@@ -50,6 +54,7 @@ int EffVsP(const char* filename, TGraphErrors *&graph_mckm)
 
     npran++;
   }
+  //extract uncertainty of pt
   for (int i=0;i<npran;i++){
     if (i==npran-1 || i==1) {
       npe[i] = (np[i]-np[i-1])/2.0;
@@ -132,6 +137,29 @@ int main(int argc, char** argv)
   if (g_mcKm==0 || g_dataKm==0) return 1;
 
   TCanvas *c1 = new TCanvas();
+  //c1->SetMargin(0.15,0.1,0.15,0.1);
+  //c1->Divide();
+  TPad *pad1 = new TPad("pad1","pad1",0.05,0.3,1,0.98);
+  TPad *pad2 = new TPad("pad2","pad2",0.05,0.02,1,0.3);
+  pad1->SetTopMargin(0.05);
+  pad1->SetBottomMargin(0.02);
+  pad2->SetTopMargin(0.05);
+  pad2->SetBottomMargin(0.3);
+  pad1->Draw();
+  pad2->Draw();
+  pad1->cd();
+
+  g_mcKm->SetTitle("");
+  g_mcKm->GetXaxis()->SetTitleSize(0.05);
+  g_mcKm->GetXaxis()->SetLabelSize(0.05);
+  g_mcKm->GetXaxis()->SetLabelOffset(1.1);
+  g_mcKm->GetXaxis()->SetTitleOffset(1.1);
+  g_mcKm->GetXaxis()->SetNdivisions(505);
+  g_mcKm->GetYaxis()->SetTitleSize(0.05);
+  g_mcKm->GetYaxis()->SetLabelSize(0.05);
+  g_mcKm->GetYaxis()->SetTitleOffset(1.1);
+  g_mcKm->GetYaxis()->SetNdivisions(505);
+  g_mcKm->GetYaxis()->SetRangeUser(0,1.2);
   g_mcKm->SetLineColor(2);
   g_mcKm->SetMarkerColor(2);
   g_mcKm->SetFillColor(0);
@@ -142,12 +170,78 @@ int main(int argc, char** argv)
   g_dataKm->SetFillColor(0);
   g_dataKm->Draw("P");
   
-  TLegend *legend = new TLegend(0.5,0.15,0.8,0.35);
-  legend->AddEntry(g_mcKm,"MC K^{+}");
-  legend->AddEntry(g_dataKm,"DATA K^{+}");
+  TLegend *legend = new TLegend(0.5,0.4,0.7,0.55);
+  legend->AddEntry(g_mcKm,"MC K^{-}");
+  legend->AddEntry(g_dataKm,"DATA K^{-}");
   legend->Draw();
 
-  c1->Print("EffVsP_MC_Data.pdf");
+  //c1->Print("EffVsP_MC_Data.pdf");
+  
+  pad2->cd();
+  // compare two graphs
+  double* xx;
+  double* xe;
+  double yy[100];
+  double ye[100];
+  double yyres[100];
+  double yeres[100];
+  int np_mc = g_mcKm->GetN();
+  int np_data = g_dataKm->GetN();
+  if (np_mc != np_data) {
+    cout<< "size of two graph are not equal, pleare check it."<<endl;
+    cout<< "mc size is "<< np_mc<<", data size is "<< np_data<<endl;
+    return -1;
+  }
+  xx = g_mcKm->GetX();
+  xe = g_mcKm->GetEX();
+  for (int i=0 ; i<np_mc; i++){
+    double y1,y2,ye1,ye2;
+    y1 = g_dataKm->GetY()[i]; y2 = g_mcKm->GetY()[i];
+    yy[i] = y1 - y2;
+    ye[i] = sqrt(pow(g_dataKm->GetEY()[i],2)+pow(g_mcKm->GetEY()[i],2));
+    if (fabs(y1)<1e-9) {yyres[i]=0;yeres[i]=0;continue;}
+    yyres[i] = (y2 - y1)/y1*100;
+    yeres[i] = ye[i]/y1*100;
+  }
+  TGraphErrors* effcmp = new TGraphErrors(np_mc,xx,yy,xe,ye);
+  effcmp->SetTitle("");
+  effcmp->GetXaxis()->SetTitle("p_{t} (GeV/c)");
+  effcmp->GetYaxis()->SetTitle("#epsilon_{data} - #epsilon_{MC}");
+  
+  effcmp->GetXaxis()->SetTitleSize(0.12);
+  effcmp->GetXaxis()->SetLabelSize(0.12);
+  effcmp->GetXaxis()->SetTitleOffset(1.1);
+  effcmp->GetXaxis()->SetNdivisions(505);
+  effcmp->GetYaxis()->SetRangeUser(-0.1,0.1);
+  effcmp->GetYaxis()->SetTitleSize(0.12);
+  effcmp->GetYaxis()->SetLabelSize(0.12);
+  effcmp->GetYaxis()->SetTitleOffset(0.4);
+  effcmp->GetYaxis()->SetNdivisions(502);
+ 
+  //c1->Clear();
+  effcmp->Draw("AP");
+  TF1 f1("f1","0",0,1.5);
+  f1.SetLineStyle(kDashed);
+  f1.Draw("same");
+  c1->Update();
+  c1->Print("effcmp.pdf");
+  
+  // relatively
+  TGraphErrors* effcmp2 = new TGraphErrors(np_mc,xx,yyres,xe,yeres);
+  effcmp2->SetTitle("compare data and MC");
+  effcmp2->GetXaxis()->SetTitle("p_{t} (GeV/c)");
+  effcmp2->GetYaxis()->SetTitle("#Delta#epsilon (%)");
+  c1->Clear();
+  effcmp2->Draw("AP");
+//TF1 f1("f1","0",0,1.5);
+//f1.SetLineStyle(kDashed);
+  f1.Draw("same");
+  c1->Print("effcmp_relative.pdf");
+  
+  TFile *f = new TFile("output.root","recreate");
+  f->WriteTObject(effcmp,"diff");
+  f->WriteTObject(effcmp2,"rela_diff");
+
   return 0;
 
 }

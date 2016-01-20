@@ -1,8 +1,8 @@
 //////////////////////////////////////////////////////////
 // This class has been automatically generated on
-// Tue Sep  8 21:36:37 2015 by ROOT version 5.34/28
+// Fri Jan 15 10:49:40 2016 by ROOT version 5.34/28
 // from TTree KaonTrack/ks N-Tuple example
-// found on file: KK_30800.root
+// found on file: combined/KK_29000.root
 //////////////////////////////////////////////////////////
 
 #ifndef KaonTrack_h
@@ -15,8 +15,8 @@
 // Header file for the classes stored in the TTree if any.
 
 // Fixed size dimensions of array or collections stored in the TTree if any.
-
 class TrackingAlg;
+
 class KaonTrack {
 public :
    TTree          *fChain;   //!pointer to the analyzed TTree or TChain
@@ -30,32 +30,26 @@ public :
    Int_t           pdgid[100];   //[indexmc]
    Int_t           motheridx[100];   //[indexmc]
    Int_t           ISRtag;
-   Int_t           Ktag;
+   Int_t           Ktag; // K+ K- pi+ pi-
    Int_t           ngch;
    Int_t           ncharg;
    Int_t           nneu;
-   Int_t           pi1chrg;
-   Double_t        pi1px;
-   Double_t        pi1py;
-   Double_t        pi1pz;
-   Double_t        pi1e;
-   Int_t           pi2chrg;
-   Double_t        pi2px;
-   Double_t        pi2py;
-   Double_t        pi2pz;
-   Double_t        pi2e;
-   Int_t           ka1chrg;
-   Double_t        ka1px;
-   Double_t        ka1py;
-   Double_t        ka1pz;
-   Double_t        ka1e;
-   Int_t           ka_chrg;
-   Double_t        ka_px;
-   Double_t        ka_py;
-   Double_t        ka_pz;
-   Double_t        ka_e;
-   Double_t        costheta;
-   Double_t        vtxchi2;
+   Double_t        pippx;
+   Double_t        pippy;
+   Double_t        pippz;
+   Double_t        pipe;
+   Double_t        pimpx;
+   Double_t        pimpy;
+   Double_t        pimpz;
+   Double_t        pime;
+   Double_t        kappx;
+   Double_t        kappy;
+   Double_t        kappz;
+   Double_t        kape;
+   Double_t        kampx;
+   Double_t        kampy;
+   Double_t        kampz;
+   Double_t        kame;
 
    // List of branches
    TBranch        *b_run;   //!
@@ -69,28 +63,22 @@ public :
    TBranch        *b_ngch;   //!
    TBranch        *b_ncharg;   //!
    TBranch        *b_nneu;   //!
-   TBranch        *b_pi1chrg;   //!
-   TBranch        *b_pi1px;   //!
-   TBranch        *b_pi1py;   //!
-   TBranch        *b_pi1pz;   //!
-   TBranch        *b_pi1e;   //!
-   TBranch        *b_pi2chrg;   //!
-   TBranch        *b_pi2px;   //!
-   TBranch        *b_pi2py;   //!
-   TBranch        *b_pi2pz;   //!
-   TBranch        *b_pi2e;   //!
-   TBranch        *b_ka1chrg;   //!
-   TBranch        *b_ka1px;   //!
-   TBranch        *b_ka1py;   //!
-   TBranch        *b_ka1pz;   //!
-   TBranch        *b_ka1e;   //!
-   TBranch        *b_ka_chrg;   //!
-   TBranch        *b_ka_px;   //!
-   TBranch        *b_ka_py;   //!
-   TBranch        *b_ka_pz;   //!
-   TBranch        *b_ka_e;   //!
-   TBranch        *b_costheta;   //!
-   TBranch        *b_vtxchi2;   //!
+   TBranch        *b_pippx;   //!
+   TBranch        *b_pippy;   //!
+   TBranch        *b_pippz;   //!
+   TBranch        *b_pipe;   //!
+   TBranch        *b_pimpx;   //!
+   TBranch        *b_pimpy;   //!
+   TBranch        *b_pimpz;   //!
+   TBranch        *b_pime;   //!
+   TBranch        *b_kappx;   //!
+   TBranch        *b_kappy;   //!
+   TBranch        *b_kappz;   //!
+   TBranch        *b_kape;   //!
+   TBranch        *b_kampx;   //!
+   TBranch        *b_kampy;   //!
+   TBranch        *b_kampz;   //!
+   TBranch        *b_kame;   //!
 
    KaonTrack(TTree *tree=0);
    virtual ~KaonTrack();
@@ -98,7 +86,10 @@ public :
    virtual Int_t    GetEntry(Long64_t entry);
    virtual Long64_t LoadTree(Long64_t entry);
    virtual void     Init(TTree *tree);
-   virtual void     Loop(TrackingAlg *trkalg);
+   virtual void     LoopH(TrackingAlg* trkalg);
+   virtual void     LoopA(TrackingAlg* trkalg);
+   virtual void     Loop(TrackingAlg* trkalg);
+   virtual void     Loop(TrackingAlg* trkalg,int parti);
    virtual Bool_t   Notify();
    virtual void     Show(Long64_t entry = -1);
 };
@@ -111,9 +102,9 @@ KaonTrack::KaonTrack(TTree *tree) : fChain(0)
 // if parameter tree is not specified (or zero), connect the file
 // used to generate this class and read the Tree.
    if (tree == 0) {
-      TFile *f = (TFile*)gROOT->GetListOfFiles()->FindObject("KK_30800.root");
+      TFile *f = (TFile*)gROOT->GetListOfFiles()->FindObject("combined/KK_29000.root");
       if (!f || !f->IsOpen()) {
-         f = new TFile("KK_30800.root");
+         f = new TFile("combined/KK_29000.root");
       }
       f->GetObject("KaonTrack",tree);
 
@@ -173,28 +164,22 @@ void KaonTrack::Init(TTree *tree)
    fChain->SetBranchAddress("ngch", &ngch, &b_ngch);
    fChain->SetBranchAddress("ncharg", &ncharg, &b_ncharg);
    fChain->SetBranchAddress("nneu", &nneu, &b_nneu);
-   fChain->SetBranchAddress("pi1chrg", &pi1chrg, &b_pi1chrg);
-   fChain->SetBranchAddress("pi1px", &pi1px, &b_pi1px);
-   fChain->SetBranchAddress("pi1py", &pi1py, &b_pi1py);
-   fChain->SetBranchAddress("pi1pz", &pi1pz, &b_pi1pz);
-   fChain->SetBranchAddress("pi1e", &pi1e, &b_pi1e);
-   fChain->SetBranchAddress("pi2chrg", &pi2chrg, &b_pi2chrg);
-   fChain->SetBranchAddress("pi2px", &pi2px, &b_pi2px);
-   fChain->SetBranchAddress("pi2py", &pi2py, &b_pi2py);
-   fChain->SetBranchAddress("pi2pz", &pi2pz, &b_pi2pz);
-   fChain->SetBranchAddress("pi2e", &pi2e, &b_pi2e);
-   fChain->SetBranchAddress("ka1chrg", &ka1chrg, &b_ka1chrg);
-   fChain->SetBranchAddress("ka1px", &ka1px, &b_ka1px);
-   fChain->SetBranchAddress("ka1py", &ka1py, &b_ka1py);
-   fChain->SetBranchAddress("ka1pz", &ka1pz, &b_ka1pz);
-   fChain->SetBranchAddress("ka1e", &ka1e, &b_ka1e);
-   fChain->SetBranchAddress("ka_chrg", &ka_chrg, &b_ka_chrg);
-   fChain->SetBranchAddress("ka_px", &ka_px, &b_ka_px);
-   fChain->SetBranchAddress("ka_py", &ka_py, &b_ka_py);
-   fChain->SetBranchAddress("ka_pz", &ka_pz, &b_ka_pz);
-   fChain->SetBranchAddress("ka_e", &ka_e, &b_ka_e);
-   fChain->SetBranchAddress("costheta", &costheta, &b_costheta);
-   fChain->SetBranchAddress("vtxchi2", &vtxchi2, &b_vtxchi2);
+   fChain->SetBranchAddress("pippx", &pippx, &b_pippx);
+   fChain->SetBranchAddress("pippy", &pippy, &b_pippy);
+   fChain->SetBranchAddress("pippz", &pippz, &b_pippz);
+   fChain->SetBranchAddress("pipe", &pipe, &b_pipe);
+   fChain->SetBranchAddress("pimpx", &pimpx, &b_pimpx);
+   fChain->SetBranchAddress("pimpy", &pimpy, &b_pimpy);
+   fChain->SetBranchAddress("pimpz", &pimpz, &b_pimpz);
+   fChain->SetBranchAddress("pime", &pime, &b_pime);
+   fChain->SetBranchAddress("kappx", &kappx, &b_kappx);
+   fChain->SetBranchAddress("kappy", &kappy, &b_kappy);
+   fChain->SetBranchAddress("kappz", &kappz, &b_kappz);
+   fChain->SetBranchAddress("kape", &kape, &b_kape);
+   fChain->SetBranchAddress("kampx", &kampx, &b_kampx);
+   fChain->SetBranchAddress("kampy", &kampy, &b_kampy);
+   fChain->SetBranchAddress("kampz", &kampz, &b_kampz);
+   fChain->SetBranchAddress("kame", &kame, &b_kame);
    Notify();
 }
 
